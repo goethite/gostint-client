@@ -20,15 +20,19 @@ along with gostint.  If not, see <https://www.gnu.org/licenses/>.
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -162,6 +166,7 @@ func buildJob(c cliRequest) (*job, error) {
 func chkError(err error) {
 	if err != nil {
 		color.HiRed(fmt.Sprintf("Error: %s", err.Error()))
+		// panic(err)
 		os.Exit(1)
 	}
 }
@@ -209,13 +214,13 @@ func submitJob(c *cliRequest, jsonBytes *[]byte, token string) (*submitResponse,
 	}
 	defer resp.Body.Close()
 
-	color.HiBlue(fmt.Sprintf("Response status: %s", resp.Status))
-	color.HiBlue(fmt.Sprintf("Response headers: %s", resp.Header))
+	// color.HiBlue(fmt.Sprintf("Response status: %s", resp.Status))
+	// color.HiBlue(fmt.Sprintf("Response headers: %s", resp.Header))
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	color.HiBlue(fmt.Sprintf("Response body:\n%s", string(body)))
+	// color.HiBlue(fmt.Sprintf("Response body:\n%s", string(body)))
 
 	subResp := submitResponse{}
 	err = json.Unmarshal(body, &subResp)
@@ -257,13 +262,13 @@ func getJob(c *cliRequest, token string, ID string) (*getResponse, error) {
 	}
 	defer resp.Body.Close()
 
-	color.HiBlue(fmt.Sprintf("Response status: %s", resp.Status))
-	color.HiBlue(fmt.Sprintf("Response headers: %s", resp.Header))
+	// color.HiBlue(fmt.Sprintf("Response status: %s", resp.Status))
+	// color.HiBlue(fmt.Sprintf("Response headers: %s", resp.Header))
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	color.HiBlue(fmt.Sprintf("Response body:\n%s", string(body)))
+	// color.HiBlue(fmt.Sprintf("Response body:\n%s", string(body)))
 
 	getResp := getResponse{}
 	err = json.Unmarshal(body, &getResp)
@@ -287,6 +292,105 @@ type getResponse struct {
 	ReturnCode     int    `json:"return_code"`
 }
 
+func getContent(content *string) (*bytes.Buffer, error) {
+	var buf bytes.Buffer
+	if *content == "" {
+		return bytes.NewBuffer([]byte{}), nil
+	}
+	if *content == "." {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return bytes.NewBuffer([]byte{}), err
+		}
+		*content = cwd
+	}
+	fi, err := os.Stat(*content)
+	if err != nil {
+		return bytes.NewBuffer([]byte{}), err
+	}
+
+	if fi.Mode().IsDir() { // if content points to a folder
+		// from blog: https://medium.com/@skdomino/taring-untaring-files-in-go-6b07cf56bc07
+		gzw := gzip.NewWriter(&buf)
+		defer gzw.Close()
+		tw := tar.NewWriter(gzw)
+		defer tw.Close()
+
+		// walk path
+		err = filepath.Walk(*content, func(file string, fi os.FileInfo, err error) error {
+
+			// return on any error
+			if err != nil {
+				return err
+			}
+
+			// create a new dir/file header
+			header, err := tar.FileInfoHeader(fi, fi.Name())
+			if err != nil {
+				return err
+			}
+
+			// update the name to correctly reflect the desired destination when untaring
+			// fmt.Printf("header.Name: %s\n", header.Name)
+			header.Name = strings.TrimPrefix(strings.TrimPrefix(file, *content), string(filepath.Separator))
+			// fmt.Printf("header.Name: %s\n", header.Name)
+			// write the header
+			if err := tw.WriteHeader(header); err != nil {
+				return err
+			}
+
+			// return on non-regular files (thanks to [kumo](https://medium.com/@komuw/just-like-you-did-fbdd7df829d3) for this suggested update)
+			if !fi.Mode().IsRegular() {
+				return nil
+			}
+
+			// open file for taring
+			f, err := os.Open(file)
+			if err != nil {
+				return err
+			}
+
+			// copy file data into tar writer
+			if _, err := io.Copy(tw, f); err != nil {
+				return err
+			}
+
+			// manually close here after each file operation; defering would cause each file close
+			// to wait until all operations have completed.
+			f.Close()
+
+			return nil
+		})
+
+		if err != nil {
+			return bytes.NewBuffer([]byte{}), err
+		}
+		return &buf, nil
+
+	} else if fi.Mode().IsRegular() { // Test if content points to a tar.gz file
+		var b []byte
+		b, err = ioutil.ReadFile(*content)
+		if err != nil {
+			return &buf, err
+		}
+		return bytes.NewBuffer(b), nil
+	}
+
+	return bytes.NewBuffer([]byte{}), fmt.Errorf("Unsupported file mode for content")
+}
+
+func encodeContent(content *string) error {
+	buf, err := getContent(content)
+	if err != nil {
+		return err
+	}
+
+	// Base64 encode targz into a string and store back in content
+	*content = fmt.Sprintf("targz,%s", base64.StdEncoding.EncodeToString(buf.Bytes()))
+	// fmt.Printf("content: %s\n", *content)
+	return nil
+}
+
 func main() {
 	c := cliRequest{}
 	c.AppRoleID = flag.String("vault-roleid", "", "Vault App Role ID (can read file e.g. '@role_id.txt')")
@@ -297,7 +401,7 @@ func main() {
 
 	c.QName = flag.String("qname", "", "Job Queue to submit to, overrides value in job-json")
 	c.ContainerImage = flag.String("image", "", "Docker image to run job within, overrides value in job-json")
-	c.Content = flag.String("content", "", "Folder to inject into the container relative to root '/' folder, overrides value in job-json")
+	c.Content = flag.String("content", "", "Folder or targz to inject into the container relative to root '/' folder, overrides value in job-json")
 	c.EntryPoint = flag.String("entrypoint", "", "JSON array of string parts defining the container's entrypoint, e.g.: '[\"ansible\"]', overrides value in job-json")
 	c.Run = flag.String("run", "", "JSON array of string parts defining the command to run in the container - aka the job, e.g.: '[\"-m\", \"ping\", \"127.0.0.1\"]', overrides value in job-json")
 	c.WorkingDir = flag.String("run-dir", "", "Working directory within the container to run the job")
@@ -320,6 +424,9 @@ func main() {
 	err = tryResolveFile(c.Token)
 	chkError(err)
 	err = tryResolveFile(c.JobJSON)
+	chkError(err)
+
+	err = encodeContent(c.Content)
 	chkError(err)
 
 	job, err := buildJob(c)
@@ -347,7 +454,6 @@ func main() {
 	sec, err = vc.Logical().Write("auth/approle/role/gostint-role/secret-id", nil)
 	chkError(err)
 	wrapSecretID := sec.WrapInfo.Token
-	fmt.Printf("wrapSecretID: %s\n", wrapSecretID)
 	vc.SetWrappingLookupFunc(nil)
 
 	jsonBytes, err := json.Marshal(*job)
@@ -360,7 +466,6 @@ func main() {
 	sec, err = vc.Logical().Write("transit/encrypt/gostint", data)
 	chkError(err)
 	encryptedPayload := sec.Data["ciphertext"]
-	fmt.Printf("encryptedPayload: %s\n", encryptedPayload)
 
 	// Get minimal limited use / ttl token for the cubbyhole
 	data = map[string]interface{}{
@@ -371,7 +476,6 @@ func main() {
 	sec, err = vc.Logical().Write("auth/token/create", data)
 	chkError(err)
 	cubbyToken := sec.Auth.ClientToken
-	fmt.Printf("cubbyToken: %s\n", cubbyToken)
 
 	// Put payload in a cubbyhole
 	vc.SetToken(cubbyToken)
@@ -399,11 +503,16 @@ func main() {
 	for {
 		getResp, err = getJob(&c, apiToken, subResp.ID)
 		chkError(err)
-		fmt.Printf("getResp: %t\n", getResp)
+		// fmt.Printf("getResp: %t\n", getResp)
 		if getResp.Status != "queued" && getResp.Status != "running" {
 			break
 		}
 		time.Sleep(1000 * time.Millisecond)
+	}
+	if getResp.Status == "success" {
+		fmt.Printf(getResp.Output)
+	} else {
+		color.HiRed(fmt.Sprintf("[%s] %s", getResp.Status, getResp.Output))
 	}
 }
 
