@@ -102,7 +102,8 @@ func tryResolveFile(p *string) error {
 		if err != nil {
 			return err
 		}
-		*p = string(b)
+		*p = strings.Trim(string(b), " \t\n\r")
+		// debug("file contents:\n%s", *p)
 	}
 	return nil
 }
@@ -350,9 +351,14 @@ func getContent(content *string) (*bytes.Buffer, error) {
 			}
 
 			// update the name to correctly reflect the desired destination when untaring
-			// fmt.Printf("header.Name: %s\n", header.Name)
 			header.Name = strings.TrimPrefix(strings.TrimPrefix(file, *content), string(filepath.Separator))
-			// fmt.Printf("header.Name: %s\n", header.Name)
+
+			// force uid/gid of injected content to 2001(gostint)
+			header.Uid = 2001
+			header.Gid = 2001
+			header.Uname = "gostint"
+			header.Gname = "gostint"
+
 			// write the header
 			if err := tw.WriteHeader(header); err != nil {
 				return err
