@@ -10,6 +10,10 @@ go run main.go -vault-token=root \
 ```
 
 ## Examples
+* see https://github.com/goethite/gostint/tree/master/tests for referenced content below.
+* Examples below are using a vault root token for demo purposes.  In production
+  you would use AppRole Authentication - see AppRole examples further down, which
+  includes the required minimal vault policy definition.
 
 ### Debugging with -debug option
 ```
@@ -99,4 +103,49 @@ ok: [127.0.0.1] => {
 
 PLAY RECAP *********************************************************************
 127.0.0.1                  : ok=3    changed=0    unreachable=0    failed=0   
+```
+
+### Using Vault AppRole Authentication
+
+Create a vault policy for the gostint-client's approle
+```
+vault policy write gostint-client - <<EOF
+path "auth/token/create" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+path "auth/approle/role/gostint-role/secret-id" {
+  capabilities = ["update"]
+}
+path "transit/encrypt/gostint" {
+  capabilities = ["update"]
+}
+EOF
+```
+
+Create an AppRole (PUSH mode for this example) for the gostint-client:
+```
+vault write auth/approle/role/gostint-client-role \
+  token_ttl=20m \
+  token_max_ttl=30m \
+  policies="gostint-client"
+```
+Get the Role_Id for the AppRole:
+```
+vault read /auth/approle/role/gostint-client-role/role-id
+```
+For this example we will use PUSH mode on the AppRole (not the secret_id was a
+random uuid) - you would probably prefer to use PULL mode in production:
+```
+vault write auth/approle/role/gostint-client-role/custom-secret-id \
+  secret_id=7a32c590-aacc-11e8-a59c-8b71f9a0c1a4
+```
+
+Run gostint-client using the AppRole:
+```
+$ gostint-client -vault-roleid=43a03f77-7461-d4d2-c14d-76b39ea400d5 \
+  -vault-secretid=7a32c590-aacc-11e8-a59c-8b71f9a0c1a4 \
+  -url=https://127.0.0.1:13232 \
+  -vault-url=http://127.0.0.1:18200 \
+  -image=alpine \
+  -run='["cat", "/etc/os-release"]'
 ```

@@ -189,7 +189,7 @@ func chkError(err error) {
 	}
 }
 
-func getVaultClient(url string, token string) (*api.Client, error) {
+func getVaultClient(url string, c *cliRequest) (*api.Client, error) {
 	debug("Getting Vault api connection %s", url)
 	client, err := api.NewClient(&api.Config{
 		Address: url,
@@ -198,14 +198,29 @@ func getVaultClient(url string, token string) (*api.Client, error) {
 		return nil, err
 	}
 
+	if *c.AppRoleID != "" && *c.AppSecretID != "" {
+		debug("Using AppRole authentication")
+		data := map[string]interface{}{
+			"role_id":   *c.AppRoleID,
+			"secret_id": *c.AppSecretID,
+		}
+		sec, err2 := client.Logical().Write("/auth/approle/login", data)
+		if err2 != nil {
+			return nil, err2
+		}
+		debug("policies %v", sec.Auth.Policies)
+		*c.Token = sec.Auth.ClientToken
+	}
+
 	debug("Authenticating with Vault")
-	client.SetToken(token)
+	client.SetToken(*c.Token)
 
 	// Verify the token is good
 	_, err = client.Logical().Read("auth/token/lookup-self")
 	if err != nil {
 		return nil, err
 	}
+	debug("Vault token authenticated ok")
 	return client, nil
 }
 
@@ -470,9 +485,7 @@ func main() {
 		*c.VaultURL = os.Getenv("VAULT_ADDR")
 	}
 
-	// TODO: Resolve this client's approle to c.Token
-
-	vc, err := getVaultClient(*c.VaultURL, *c.Token)
+	vc, err := getVaultClient(*c.VaultURL, &c)
 	chkError(err)
 
 	debug("Getting minimal token to authenticate with GoStint API")
