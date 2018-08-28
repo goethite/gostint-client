@@ -40,6 +40,18 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
+var enableDebug = false
+
+func debug(format string, a ...interface{}) {
+	if !enableDebug {
+		return
+	}
+	t := time.Now()
+	d := color.New(color.FgBlue).Add(color.Bold)
+	d.Printf(t.Format(time.RFC3339)+" "+format, a...)
+	fmt.Println()
+}
+
 type cliRequest struct {
 	AppRoleID      *string
 	AppSecretID    *string // AppRole auth or Token
@@ -59,6 +71,7 @@ type cliRequest struct {
 }
 
 func validate(c cliRequest) error {
+	debug("Validating command line arguments")
 	if *c.URL == "" {
 		return fmt.Errorf("url must be specified")
 	}
@@ -84,6 +97,7 @@ func validate(c cliRequest) error {
 
 func tryResolveFile(p *string) error {
 	if strings.HasPrefix(*p, "@") {
+		debug("Resolving file argument %s", *p)
 		b, err := ioutil.ReadFile(strings.TrimPrefix(*p, "@"))
 		if err != nil {
 			return err
@@ -107,6 +121,7 @@ type job struct {
 
 // func buildJob(c cliRequest) (*[]byte, error) {
 func buildJob(c cliRequest) (*job, error) {
+	debug("Building Job Request")
 	j := job{}
 
 	if *c.JobJSON != "" {
@@ -165,13 +180,16 @@ func buildJob(c cliRequest) (*job, error) {
 
 func chkError(err error) {
 	if err != nil {
-		color.HiRed(fmt.Sprintf("Error: %s", err.Error()))
+		// color.HiRed(fmt.Sprintf("Error: %s", err.Error()))
+		var red = color.New(color.FgRed).Add(color.Bold).SprintfFunc()
+		fmt.Fprintln(color.Error, red("Error: %s", err.Error()))
 		// panic(err)
 		os.Exit(1)
 	}
 }
 
 func getVaultClient(url string, token string) (*api.Client, error) {
+	debug("Getting Vault api connection %s", url)
 	client, err := api.NewClient(&api.Config{
 		Address: url,
 	})
@@ -179,6 +197,7 @@ func getVaultClient(url string, token string) (*api.Client, error) {
 		return nil, err
 	}
 
+	debug("Authenticating with Vault")
 	client.SetToken(token)
 
 	// Verify the token is good
@@ -190,6 +209,7 @@ func getVaultClient(url string, token string) (*api.Client, error) {
 }
 
 func submitJob(c *cliRequest, jsonBytes *[]byte, token string) (*submitResponse, error) {
+	debug("Submitting job")
 	req, err := http.NewRequest(
 		"POST",
 		fmt.Sprintf("%s/v1/api/job", *c.URL),
@@ -214,13 +234,13 @@ func submitJob(c *cliRequest, jsonBytes *[]byte, token string) (*submitResponse,
 	}
 	defer resp.Body.Close()
 
-	// color.HiBlue(fmt.Sprintf("Response status: %s", resp.Status))
-	// color.HiBlue(fmt.Sprintf("Response headers: %s", resp.Header))
+	debug("Response status: %s", resp.Status)
+	debug("Response headers: %s", resp.Header)
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	// color.HiBlue(fmt.Sprintf("Response body:\n%s", string(body)))
+	debug("Response body:\n%s", string(body))
 
 	subResp := submitResponse{}
 	err = json.Unmarshal(body, &subResp)
@@ -238,6 +258,7 @@ type submitResponse struct {
 }
 
 func getJob(c *cliRequest, token string, ID string) (*getResponse, error) {
+	debug("Getting job state")
 	req, err := http.NewRequest(
 		"GET",
 		fmt.Sprintf("%s/v1/api/job/%s", *c.URL, ID),
@@ -262,13 +283,13 @@ func getJob(c *cliRequest, token string, ID string) (*getResponse, error) {
 	}
 	defer resp.Body.Close()
 
-	// color.HiBlue(fmt.Sprintf("Response status: %s", resp.Status))
-	// color.HiBlue(fmt.Sprintf("Response headers: %s", resp.Header))
+	debug("Response status: %s", resp.Status)
+	debug("Response headers: %s", resp.Header)
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	// color.HiBlue(fmt.Sprintf("Response body:\n%s", string(body)))
+	debug("Response body:\n%s", string(body))
 
 	getResp := getResponse{}
 	err = json.Unmarshal(body, &getResp)
@@ -293,10 +314,8 @@ type getResponse struct {
 }
 
 func getContent(content *string) (*bytes.Buffer, error) {
+	debug("Packing content from %s", *content)
 	var buf bytes.Buffer
-	if *content == "" {
-		return bytes.NewBuffer([]byte{}), nil
-	}
 	if *content == "." {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -380,6 +399,10 @@ func getContent(content *string) (*bytes.Buffer, error) {
 }
 
 func encodeContent(content *string) error {
+	if *content == "" {
+		return nil
+	}
+	debug("Encoding content from %s", *content)
 	buf, err := getContent(content)
 	if err != nil {
 		return err
@@ -392,6 +415,7 @@ func encodeContent(content *string) error {
 }
 
 func main() {
+	start := time.Now()
 	c := cliRequest{}
 	c.AppRoleID = flag.String("vault-roleid", "", "Vault App Role ID (can read file e.g. '@role_id.txt')")
 	c.AppSecretID = flag.String("vault-secretid", "", "Vault App Secret ID (can read file e.g. '@secret_id.txt')")
@@ -412,7 +436,11 @@ func main() {
 	c.URL = flag.String("url", "", "GoStint API URL, e.g. https://somewhere:3232")
 	c.VaultURL = flag.String("vault-url", "", "Vault API URL, e.g. https://your-vault:8200 - defaults to env var VAULT_ADDR")
 
+	deb := flag.Bool("debug", false, "Enable debugging")
+	pollIntervalSecs := flag.Int("poll-interval", 1, "Overide default poll interval for results (in seconds)")
+
 	flag.Parse()
+	enableDebug = *deb
 
 	err := validate(c)
 	chkError(err)
@@ -441,7 +469,7 @@ func main() {
 	vc, err := getVaultClient(*c.VaultURL, *c.Token)
 	chkError(err)
 
-	// Get minimal token to authenticate with GoStint API
+	debug("Getting minimal token to authenticate with GoStint API")
 	data := map[string]interface{}{
 		"policies": []string{"default"},
 	}
@@ -449,7 +477,7 @@ func main() {
 	chkError(err)
 	apiToken := sec.Auth.ClientToken
 
-	// Get Wrapped Secret_ID for the AppRole
+	debug("Getting Wrapped Secret_ID for the AppRole")
 	vc.SetWrappingLookupFunc(func(op, path string) string { return "1h" })
 	sec, err = vc.Logical().Write("auth/approle/role/gostint-role/secret-id", nil)
 	chkError(err)
@@ -459,7 +487,7 @@ func main() {
 	jsonBytes, err := json.Marshal(*job)
 	chkError(err)
 
-	// Encrypt the job payload
+	debug("Encrypting the job payload")
 	data = map[string]interface{}{
 		"plaintext": base64.StdEncoding.EncodeToString(jsonBytes),
 	}
@@ -467,7 +495,7 @@ func main() {
 	chkError(err)
 	encryptedPayload := sec.Data["ciphertext"]
 
-	// Get minimal limited use / ttl token for the cubbyhole
+	debug("Getting minimal limited use / ttl token for the cubbyhole")
 	data = map[string]interface{}{
 		"policies":  []string{"default"},
 		"ttl":       "60m",
@@ -477,7 +505,7 @@ func main() {
 	chkError(err)
 	cubbyToken := sec.Auth.ClientToken
 
-	// Put payload in a cubbyhole
+	debug("Putting encrypted payload in a vault cubbyhole")
 	vc.SetToken(cubbyToken)
 	data = map[string]interface{}{
 		"payload": encryptedPayload,
@@ -485,7 +513,7 @@ func main() {
 	sec, err = vc.Logical().Write("cubbyhole/job", data)
 	chkError(err)
 
-	// Create job request wrapper to submit
+	debug("Creating job request wrapper to submit")
 	jWrap := jobWrapper{
 		QName:        job.QName,
 		CubbyToken:   cubbyToken,
@@ -507,13 +535,18 @@ func main() {
 		if getResp.Status != "queued" && getResp.Status != "running" {
 			break
 		}
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(time.Duration(*pollIntervalSecs) * time.Second)
 	}
+	debug("Final job state: %v", getResp)
 	if getResp.Status == "success" {
 		fmt.Printf(getResp.Output)
 	} else {
 		color.HiRed(fmt.Sprintf("[%s] %s", getResp.Status, getResp.Output))
 	}
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+	debug("Elapsed time: %.3f seconds", float64(elapsed/time.Millisecond)/1000.0)
 }
 
 type jobWrapper struct {
