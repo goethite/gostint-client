@@ -102,6 +102,7 @@ func main() {
 	c.EntryPoint = flag.String("entrypoint", "", "JSON array of string parts defining the container's entrypoint, e.g.: '[\"ansible\"]', overrides value in job-json")
 	c.Run = flag.String("run", "", "JSON array of string parts defining the command to run in the container - aka the job, e.g.: '[\"-m\", \"ping\", \"127.0.0.1\"]', overrides value in job-json")
 	c.WorkingDir = flag.String("run-dir", "", "Working directory within the container to run the job")
+	c.EnvVars = flag.String("env-vars", "", "JSON array of strings providing envronment variables to be passed to the job container, e.g.: '[\"MYVAR=value\"]'")
 	c.SecretRefs = flag.String("secret-refs", "", "JSON array of strings providing paths to secrets in the Vault to be injected into the job's container, e.g.: '[\"mysecret@secret/data/my-secret.my-value\", ...]', overrides value in job-json")
 	c.SecretFileType = flag.String("secret-filetype", "yaml", "Injected secret file type, can be either 'yaml' (default) or 'json', overrides value in job-json")
 	c.ContOnWarnings = flag.Bool("cont-on-warnings", false, "Continue to run job even if vault reported warnings when looking up secret refs, overrides value in job-json")
