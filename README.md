@@ -84,7 +84,7 @@ $ gostint-client -vault-token=@.vault_token \
 ```
 
 ```
-$ ./gostint-client -vault-token=@.vault_token -url=https://127.0.0.1:13232 -vault-url=http://127.0.0.1:18200 -image="jmal98/ansiblecm:2.5.5" -content=../gostint/tests/content_ansible_play -run='["-i", "hosts", "play1.yml"]'
+$ gostint-client -vault-token=@.vault_token -url=https://127.0.0.1:13232 -vault-url=http://127.0.0.1:18200 -image="jmal98/ansiblecm:2.5.5" -content=../gostint/tests/content_ansible_play -run='["-i", "hosts", "play1.yml"]'
 
 PLAY [all] *********************************************************************
 
@@ -103,6 +103,57 @@ ok: [127.0.0.1] => {
 
 PLAY RECAP *********************************************************************
 127.0.0.1                  : ok=3    changed=0    unreachable=0    failed=0   
+```
+
+### Running kubectl & helm via gostint
+Using a KUBECONFIG stored base64 encoded in the vault as a secret:
+```
+$ vault kv put secret/k8s_cluster_1 kubeconfig_base64=$(base64 -w0 admin.conf)
+Success! Data written to: secret/k8s_cluster_1
+```
+Test kubectl can use the vaulted config:
+```
+$ gostint-client -vault-roleid=@.vault_roleid \
+  -vault-secretid=@.vault_secretid \
+  -url=https://127.0.0.1:3232 \
+  -vault-url=http://127.0.0.1:8200 \
+  -image=goethite/gostint-kubectl \
+  -run='["version"]' \
+  -secret-refs='["KUBECONFIG_BASE64@secret/k8s_cluster_1.kubeconfig_base64"]'
+
+Client Version: version.Info{Major:"1", Minor:"11", GitVersion:"v1.11.1", GitCommit:"b1b29978270dc22fecc592ac55d903350454310a", GitTreeState:"clean", BuildDate:"2018-07-17T18:53:20Z", GoVersion:"go1.10.3", Compiler:"gc", Platform:"linux/amd64"}
+Server Version: version.Info{Major:"1", Minor:"10", GitVersion:"v1.10.3", GitCommit:"2bba0127d85d5a46ab4b778548be28623b32d0b0", GitTreeState:"clean", BuildDate:"2018-05-21T09:05:37Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/amd64"}
+
+$ gostint-client -vault-roleid=@.vault_roleid \
+  -vault-secretid=@.vault_secretid \
+  -url=https://127.0.0.1:3232 \
+  -vault-url=http://127.0.0.1:8200 \
+  -image=goethite/gostint-kubectl \
+  -run='["get", "services"]' \
+  -secret-refs='["KUBECONFIG_BASE64@secret/k8s_cluster_1.kubeconfig_base64"]'
+
+NAME                          TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)             AGE
+etcd-restore-operator         ClusterIP   10.105.45.155    <none>        19999/TCP           2h
+gostint-etcd-cluster          ClusterIP   None             <none>        2379/TCP,2380/TCP   2h
+gostint-etcd-cluster-client   ClusterIP   10.106.228.203   <none>        2379/TCP            2h
+handy-opossum-gostint         ClusterIP   10.103.76.29     <none>        3232/TCP            2h
+handy-opossum-mongodb         ClusterIP   10.109.138.65    <none>        27017/TCP           2h
+handy-opossum-vault           ClusterIP   10.104.18.125    <none>        8200/TCP            2h
+kubernetes                    ClusterIP   10.96.0.1        <none>        443/TCP             17d
+```
+Test helm can use the vaulted config:
+```
+$ gostint-client -vault-roleid=@.vault_roleid \
+  -vault-secretid=@.vault_secretid \
+  -url=https://127.0.0.1:3232 \
+  -vault-url=http://127.0.0.1:8200 \
+  -image=goethite/gostint-kubectl \
+  -env-vars='["RUNCMD=/usr/local/bin/helm"]' \
+  -run='["ls"]' \
+  -secret-refs='["KUBECONFIG_BASE64@secret/k8s_cluster_1.kubeconfig_base64"]'
+
+NAME         	REVISION	UPDATED                 	STATUS  	CHART        	APP VERSION	NAMESPACE
+handy-opossum	1       	Sat Sep  1 10:59:33 2018	DEPLOYED	gostint-0.1.0	0.6        	default
 ```
 
 ### Using Vault AppRole Authentication

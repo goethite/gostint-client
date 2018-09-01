@@ -69,6 +69,7 @@ type APIRequest struct {
 	EntryPoint     *string
 	Run            *string
 	WorkingDir     *string
+	EnvVars        *string
 	SecretRefs     *string
 	SecretFileType *string
 	ContOnWarnings *bool
@@ -83,6 +84,7 @@ type job struct {
 	EntryPoint     []string `json:"entrypoint"`
 	Run            []string `json:"run"`
 	WorkingDir     string   `json:"working_directory"`
+	EnvVars        []string `json:"env_vars"`
 	SecretRefs     []string `json:"secret_refs"`
 	SecretFileType string   `json:"secret_file_type"`
 	ContOnWarnings bool     `json:"cont_on_warnings"`
@@ -128,6 +130,14 @@ func buildJob(c APIRequest) (*job, error) {
 	}
 	if *c.WorkingDir != "" {
 		j.WorkingDir = *c.WorkingDir
+	}
+	if *c.EnvVars != "" {
+		eps := make([]string, 0)
+		err := json.Unmarshal([]byte(*c.EnvVars), &eps)
+		if err != nil {
+			return nil, err
+		}
+		j.EnvVars = eps
 	}
 	if *c.SecretRefs != "" {
 		// j.SecretRefs = *c.SecretRefs
