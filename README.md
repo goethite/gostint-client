@@ -153,7 +153,7 @@ $ gostint-client -vault-roleid=@.vault_roleid \
   -secret-refs='["KUBECONFIG_BASE64@secret/k8s_cluster_1.kubeconfig_base64"]'
 
 NAME         	REVISION	UPDATED                 	STATUS  	CHART        	APP VERSION	NAMESPACE
-handy-opossum	1       	Sat Sep  1 10:59:33 2018	DEPLOYED	gostint-0.1.0	0.6        	default
+handy-opossum	1       	Sat Sep  1 10:59:33 2018	DEPLOYED	gostint-0.3.0	0.7        	default
 ```
 
 ### Using Vault AppRole Authentication
