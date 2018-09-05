@@ -1,11 +1,20 @@
 # gostint-client
-GoStint API client and commandline tool
+[GoStint](https://goethite.github.io/gostint/) API client and commandline tool
 
-## Testing agains GoStint Vagrant dev instance
+Note: The examples below have been taken in conjunction with deploying GoStint
+using the [gostint-helm](https://github.com/goethite/gostint-helm) chart in Kubernetes.
+
+Note: The examples below all use `VAULT_SKIP_VERIFY=1`, this is because they
+are pointint to a port-forward url on 127.0.0.1.  In Production you would
+instead get the `vault-client-ca.crt` from k8s Secret
+`RELEASE-gostint-vault-default-vault-client-tls`, extract the base64 string to
+a certificate file and set VAULT_CACERT to point to it.
+
+## Testing against GoStint Vagrant dev instance
 ```
-go run main.go -vault-token=root \
+VAULT_SKIP_VERIFY=1 go run main.go -vault-token=root \
   -url=https://127.0.0.1:3232 \
-  -vault-url=http://127.0.0.1:8300 \
+  -vault-url=https://127.0.0.1:8300 \
   -job-json=@../gostint/tests/job1.json
 ```
 
@@ -17,9 +26,9 @@ go run main.go -vault-token=root \
 
 ### Debugging with -debug option
 ```
-$ gostint-client -vault-token=@.vault_token \
+$ VAULT_SKIP_VERIFY=1 gostint-client -vault-token=@.vault_token \
   -url=https://127.0.0.1:13232 \
-  -vault-url=http://127.0.0.1:18200 \
+  -vault-url=https://127.0.0.1:18200 \
   -image=alpine \
   -run='["cat", "/etc/os-release"]' \
   -debug
@@ -42,9 +51,9 @@ $ gostint-client -vault-token=@.vault_token \
 
 ### Run a command in a container
 ```
-$ gostint-client -vault-token=@.vault_token \
+$ VAULT_SKIP_VERIFY=1 gostint-client -vault-token=@.vault_token \
   -url=https://127.0.0.1:13232 \
-  -vault-url=http://127.0.0.1:18200 \
+  -vault-url=https://127.0.0.1:18200 \
   -image=alpine \
   -run='["cat", "/etc/os-release"]'
 NAME="Alpine Linux"
@@ -56,9 +65,9 @@ BUG_REPORT_URL="http://bugs.alpinelinux.org"
 ```
 ### Running Ansible containers
 ```
-$ gostint-client -vault-token=@.vault_token \
+$ VAULT_SKIP_VERIFY=1 gostint-client -vault-token=@.vault_token \
   -url=https://127.0.0.1:13232 \
-  -vault-url=http://127.0.0.1:18200 \
+  -vault-url=https://127.0.0.1:18200 \
   -image="jmal98/ansiblecm:2.5.5" \
   -entrypoint='["ansible"]' \
   -run='["--version"]'
@@ -71,9 +80,9 @@ ansible 2.5.5
 ```
 
 ```
-$ gostint-client -vault-token=@.vault_token \
+$ VAULT_SKIP_VERIFY=1 gostint-client -vault-token=@.vault_token \
   -url=https://127.0.0.1:13232 \
-  -vault-url=http://127.0.0.1:18200 \
+  -vault-url=https://127.0.0.1:18200 \
   -image="jmal98/ansiblecm:2.5.5" \
   -entrypoint='["ansible"]' \
   -run='["-i", "127.0.0.1 ansible_connection=local,", "-m", "ping", "127.0.0.1"]'
@@ -84,7 +93,12 @@ $ gostint-client -vault-token=@.vault_token \
 ```
 
 ```
-$ gostint-client -vault-token=@.vault_token -url=https://127.0.0.1:13232 -vault-url=http://127.0.0.1:18200 -image="jmal98/ansiblecm:2.5.5" -content=../gostint/tests/content_ansible_play -run='["-i", "hosts", "play1.yml"]'
+$ VAULT_SKIP_VERIFY=1 gostint-client -vault-token=@.vault_token \
+  -url=https://127.0.0.1:13232 \
+  -vault-url=https://127.0.0.1:18200 \
+  -image="jmal98/ansiblecm:2.5.5" \
+  -content=../gostint/tests/content_ansible_play \
+  -run='["-i", "hosts", "play1.yml"]'
 
 PLAY [all] *********************************************************************
 
@@ -113,10 +127,10 @@ Success! Data written to: secret/k8s_cluster_1
 ```
 Test kubectl can use the vaulted config:
 ```
-$ gostint-client -vault-roleid=@.vault_roleid \
+$ VAULT_SKIP_VERIFY=1 gostint-client -vault-roleid=@.vault_roleid \
   -vault-secretid=@.vault_secretid \
   -url=https://127.0.0.1:3232 \
-  -vault-url=http://127.0.0.1:8200 \
+  -vault-url=https://127.0.0.1:8200 \
   -image=goethite/gostint-kubectl \
   -run='["version"]' \
   -secret-refs='["KUBECONFIG_BASE64@secret/k8s_cluster_1.kubeconfig_base64"]'
@@ -124,10 +138,10 @@ $ gostint-client -vault-roleid=@.vault_roleid \
 Client Version: version.Info{Major:"1", Minor:"11", GitVersion:"v1.11.1", GitCommit:"b1b29978270dc22fecc592ac55d903350454310a", GitTreeState:"clean", BuildDate:"2018-07-17T18:53:20Z", GoVersion:"go1.10.3", Compiler:"gc", Platform:"linux/amd64"}
 Server Version: version.Info{Major:"1", Minor:"10", GitVersion:"v1.10.3", GitCommit:"2bba0127d85d5a46ab4b778548be28623b32d0b0", GitTreeState:"clean", BuildDate:"2018-05-21T09:05:37Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/amd64"}
 
-$ gostint-client -vault-roleid=@.vault_roleid \
+$ VAULT_SKIP_VERIFY=1 gostint-client -vault-roleid=@.vault_roleid \
   -vault-secretid=@.vault_secretid \
   -url=https://127.0.0.1:3232 \
-  -vault-url=http://127.0.0.1:8200 \
+  -vault-url=https://127.0.0.1:8200 \
   -image=goethite/gostint-kubectl \
   -run='["get", "services"]' \
   -secret-refs='["KUBECONFIG_BASE64@secret/k8s_cluster_1.kubeconfig_base64"]'
@@ -143,10 +157,10 @@ kubernetes                    ClusterIP   10.96.0.1        <none>        443/TCP
 ```
 Test helm can use the vaulted config:
 ```
-$ gostint-client -vault-roleid=@.vault_roleid \
+$ VAULT_SKIP_VERIFY=1 gostint-client -vault-roleid=@.vault_roleid \
   -vault-secretid=@.vault_secretid \
   -url=https://127.0.0.1:3232 \
-  -vault-url=http://127.0.0.1:8200 \
+  -vault-url=https://127.0.0.1:8200 \
   -image=goethite/gostint-kubectl \
   -env-vars='["RUNCMD=/usr/local/bin/helm"]' \
   -run='["ls"]' \
@@ -193,10 +207,10 @@ vault write auth/approle/role/gostint-client-role/custom-secret-id \
 
 Run gostint-client using the AppRole:
 ```
-$ gostint-client -vault-roleid=43a03f77-7461-d4d2-c14d-76b39ea400d5 \
+$ VAULT_SKIP_VERIFY=1 gostint-client -vault-roleid=43a03f77-7461-d4d2-c14d-76b39ea400d5 \
   -vault-secretid=7a32c590-aacc-11e8-a59c-8b71f9a0c1a4 \
   -url=https://127.0.0.1:13232 \
-  -vault-url=http://127.0.0.1:18200 \
+  -vault-url=https://127.0.0.1:18200 \
   -image=alpine \
   -run='["cat", "/etc/os-release"]'
 ```
