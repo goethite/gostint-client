@@ -122,7 +122,7 @@ PLAY RECAP *********************************************************************
 ### Running kubectl & helm via gostint
 Using a KUBECONFIG stored base64 encoded in the vault as a secret:
 ```
-$ vault kv put secret/k8s_cluster_1 kubeconfig_base64=$(base64 -w0 admin.conf)
+$ vault kv put secret/k8s_cluster_1 kubeconfig_base64=$(base64 -w0 ~/k8s/openstack/admin.conf)
 Success! Data written to: secret/k8s_cluster_1
 ```
 Test kubectl can use the vaulted config:
@@ -181,7 +181,7 @@ path "auth/token/create" {
 path "auth/approle/role/gostint-role/secret-id" {
   capabilities = ["update"]
 }
-path "transit/encrypt/gostint" {
+path "transit/encrypt/gostint-role" {
   capabilities = ["update"]
 }
 EOF
@@ -196,7 +196,7 @@ vault write auth/approle/role/gostint-client-role \
 ```
 Get the Role_Id for the AppRole:
 ```
-vault read /auth/approle/role/gostint-client-role/role-id
+vault read auth/approle/role/gostint-client-role/role-id
 ```
 For this example we will use PUSH mode on the AppRole (not the secret_id was a
 random uuid) - you would probably prefer to use PULL mode in production:

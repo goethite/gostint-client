@@ -94,6 +94,8 @@ func main() {
 	c.AppSecretID = flag.String("vault-secretid", "", "Vault App Secret ID (can read file e.g. '@secret_id.txt')")
 	c.Token = flag.String("vault-token", "", "Vault token - used instead of App Role (can read file e.g. '@token.txt')")
 
+	c.GoStintRole = flag.String("gostint-approle", "gostint-role", "Vault App Role Name of GoStint to run job on (can read file e.g. '@gostint_role.txt')")
+
 	c.JobJSON = flag.String("job-json", "", "JSON Job request")
 
 	c.QName = flag.String("qname", "", "Job Queue to submit to, overrides value in job-json")
@@ -126,6 +128,8 @@ func main() {
 	err = tryResolveFile(c.AppSecretID)
 	chkError(err)
 	err = tryResolveFile(c.Token)
+	chkError(err)
+	err = tryResolveFile(c.GoStintRole)
 	chkError(err)
 	err = tryResolveFile(c.JobJSON)
 	chkError(err)

@@ -62,6 +62,7 @@ type APIRequest struct {
 	AppRoleID      *string
 	AppSecretID    *string // AppRole auth or Token
 	Token          *string
+	GoStintRole    *string
 	JobJSON        *string // request can be whole JSON:
 	QName          *string // or can be passed as parameters:
 	ContainerImage *string
@@ -342,7 +343,10 @@ func RunJob(c *APIRequest, debugLogging bool, pollSecs int, waitFor bool) (*GetR
 
 	debug("Getting Wrapped Secret_ID for the AppRole")
 	vc.SetWrappingLookupFunc(func(op, path string) string { return "1h" })
-	sec, err = vc.Logical().Write("auth/approle/role/gostint-role/secret-id", nil)
+	sec, err = vc.Logical().Write(
+		fmt.Sprintf("auth/approle/role/%s/secret-id", *c.GoStintRole),
+		nil,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +362,10 @@ func RunJob(c *APIRequest, debugLogging bool, pollSecs int, waitFor bool) (*GetR
 	data = map[string]interface{}{
 		"plaintext": base64.StdEncoding.EncodeToString(jsonBytes),
 	}
-	sec, err = vc.Logical().Write("transit/encrypt/gostint", data)
+	sec, err = vc.Logical().Write(
+		fmt.Sprintf("transit/encrypt/%s", *c.GoStintRole),
+		data,
+	)
 	if err != nil {
 		return nil, err
 	}
