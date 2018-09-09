@@ -5,7 +5,7 @@ Note: The examples below have been taken in conjunction with deploying GoStint
 using the [gostint-helm](https://github.com/goethite/gostint-helm) chart in Kubernetes.
 
 Note: The examples below all use `VAULT_SKIP_VERIFY=1`, this is because they
-are pointint to a port-forward url on 127.0.0.1.  In Production you would
+are pointing to a port-forward url on 127.0.0.1.  In Production you would
 instead get the `vault-client-ca.crt` from k8s Secret
 `RELEASE-gostint-vault-default-vault-client-tls`, extract the base64 string to
 a certificate file and set VAULT_CACERT to point to it.
