@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -59,36 +60,38 @@ func Debug(format string, a ...interface{}) {
 
 // APIRequest structure the job request passed to the client api
 type APIRequest struct {
-	AppRoleID      *string
-	AppSecretID    *string // AppRole auth or Token
-	Token          *string
-	GoStintRole    *string
-	JobJSON        *string // request can be whole JSON:
-	QName          *string // or can be passed as parameters:
-	ContainerImage *string
-	Content        *string
-	EntryPoint     *string
-	Run            *string
-	WorkingDir     *string
-	EnvVars        *string
-	SecretRefs     *string
-	SecretFileType *string
-	ContOnWarnings *bool
-	URL            *string
-	VaultURL       *string
+	AppRoleID       *string
+	AppSecretID     *string // AppRole auth or Token
+	Token           *string
+	GoStintRole     *string
+	JobJSON         *string // request can be whole JSON:
+	QName           *string // or can be passed as parameters:
+	ContainerImage  *string
+	ImagePullPolicy *string
+	Content         *string
+	EntryPoint      *string
+	Run             *string
+	WorkingDir      *string
+	EnvVars         *string
+	SecretRefs      *string
+	SecretFileType  *string
+	ContOnWarnings  *bool
+	URL             *string
+	VaultURL        *string
 }
 
 type job struct {
-	QName          string   `json:"qname"`
-	ContainerImage string   `json:"container_image"`
-	Content        string   `json:"content"`
-	EntryPoint     []string `json:"entrypoint"`
-	Run            []string `json:"run"`
-	WorkingDir     string   `json:"working_directory"`
-	EnvVars        []string `json:"env_vars"`
-	SecretRefs     []string `json:"secret_refs"`
-	SecretFileType string   `json:"secret_file_type"`
-	ContOnWarnings bool     `json:"cont_on_warnings"`
+	QName           string   `json:"qname"`
+	ContainerImage  string   `json:"container_image"`
+	ImagePullPolicy string   `json:"image_pull_policy"`
+	Content         string   `json:"content"`
+	EntryPoint      []string `json:"entrypoint"`
+	Run             []string `json:"run"`
+	WorkingDir      string   `json:"working_directory"`
+	EnvVars         []string `json:"env_vars"`
+	SecretRefs      []string `json:"secret_refs"`
+	SecretFileType  string   `json:"secret_file_type"`
+	ContOnWarnings  bool     `json:"cont_on_warnings"`
 }
 
 // func buildJob(c APIRequest) (*[]byte, error) {
@@ -107,6 +110,9 @@ func buildJob(c APIRequest) (*job, error) {
 	}
 	if *c.ContainerImage != "" {
 		j.ContainerImage = *c.ContainerImage
+	}
+	if *c.ImagePullPolicy != "" {
+		j.ImagePullPolicy = *c.ImagePullPolicy
 	}
 	if *c.Content != "" {
 		j.Content = *c.Content
@@ -340,6 +346,14 @@ func RunJob(c *APIRequest, debugLogging bool, pollSecs int, waitFor bool) (*GetR
 		return nil, err
 	}
 	apiToken := sec.Auth.ClientToken
+
+	defer func() {
+		debug("Revoking the minimal authentication token after use")
+		_, err = vc.Logical().Write("auth/token/revoke-self", nil)
+		if err != nil {
+			log.Printf("Error: revoking token after job completed: %s", err)
+		}
+	}()
 
 	debug("Getting Wrapped Secret_ID for the AppRole")
 	vc.SetWrappingLookupFunc(func(op, path string) string { return "1h" })

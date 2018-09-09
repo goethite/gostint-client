@@ -62,6 +62,10 @@ func validate(c clientapi.APIRequest) error {
 		return fmt.Errorf("vault-token cannot be used with vault-roleid")
 	}
 
+	if *c.ImagePullPolicy != "IfNotPresent" && *c.ImagePullPolicy != "Always" {
+		return fmt.Errorf("invalid image-pull-policy, must be 'IfNotPresetn' or 'Always'")
+	}
+
 	return nil
 }
 
@@ -100,6 +104,7 @@ func main() {
 
 	c.QName = flag.String("qname", "", "Job Queue to submit to, overrides value in job-json")
 	c.ContainerImage = flag.String("image", "", "Docker image to run job within, overrides value in job-json")
+	c.ImagePullPolicy = flag.String("image-pull-policy", "IfNotPresent", "Docker image pull policy: IfNotPresent or Always")
 	c.Content = flag.String("content", "", "Folder or targz to inject into the container relative to root '/' folder, overrides value in job-json")
 	c.EntryPoint = flag.String("entrypoint", "", "JSON array of string parts defining the container's entrypoint, e.g.: '[\"ansible\"]', overrides value in job-json")
 	c.Run = flag.String("run", "", "JSON array of string parts defining the command to run in the container - aka the job, e.g.: '[\"-m\", \"ping\", \"127.0.0.1\"]', overrides value in job-json")
