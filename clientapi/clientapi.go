@@ -166,9 +166,11 @@ func buildJob(c APIRequest) (*job, error) {
 
 func getVaultClient(url string, c *APIRequest) (*api.Client, error) {
 	debug("Getting Vault api connection %s", url)
-	client, err := api.NewClient(&api.Config{
-		Address: url,
-	})
+
+	cfg := api.DefaultConfig()
+	cfg.Address = url
+
+	client, err := api.NewClient(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +216,9 @@ func submitJob(c *APIRequest, jsonBytes *[]byte, token string) (*submitResponse,
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
+			// TODO: parameterise this
 			InsecureSkipVerify: true,
+			// TODO: more Cert/CA options for trust
 		},
 	}
 
