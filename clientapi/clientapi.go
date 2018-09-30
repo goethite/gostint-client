@@ -341,6 +341,8 @@ func RunJob(c *APIRequest, debugLogging bool, pollSecs int, waitFor bool) (*GetR
 		return nil, err
 	}
 
+	// TODO: this only supports direct connection to gostint api, need to be able
+	// to support routing via intermediary(s)
 	debug("Getting minimal token to authenticate with GoStint API")
 	data := map[string]interface{}{
 		"policies": []string{"default"},
@@ -359,7 +361,7 @@ func RunJob(c *APIRequest, debugLogging bool, pollSecs int, waitFor bool) (*GetR
 		}
 	}()
 
-	debug("Getting Wrapped Secret_ID for the AppRole")
+	debug("Getting Wrapped Secret_ID for the GoStint AppRole")
 	vc.SetWrappingLookupFunc(func(op, path string) string { return "1h" })
 	sec, err = vc.Logical().Write(
 		fmt.Sprintf("auth/approle/role/%s/secret-id", *c.GoStintRole),
