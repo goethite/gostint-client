@@ -198,11 +198,11 @@ Get the Role_Id for the AppRole:
 ```
 vault read auth/approle/role/gostint-client-role/role-id
 ```
-For this example we will use PUSH mode on the AppRole (not the secret_id was a
+For this example we will use PUSH mode on the AppRole (note the secret_id was a
 random uuid) - you would probably prefer to use PULL mode in production:
 ```
 vault write auth/approle/role/gostint-client-role/custom-secret-id \
-  secret_id=7a32c590-aacc-11e8-a59c-8b71f9a0c1a4
+  secret_id=bff0b7a6-c4b0-11e8-aeec-8ba641bcd663
 ```
 
 Run gostint-client using the AppRole:
