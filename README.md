@@ -214,3 +214,9 @@ $ VAULT_SKIP_VERIFY=1 gostint-client -vault-roleid=43a03f77-7461-d4d2-c14d-76b39
   -image=alpine \
   -run='["cat", "/etc/os-release"]'
 ```
+
+# License
+The gostint-client project is released under the [MIT License](LICENSE).
+
+The parent [gostint project](https://goethite.github.io/gostint/) is released
+under the [GPL3](https://github.com/goethite/gostint/blob/master/COPYING).
