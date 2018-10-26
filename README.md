@@ -122,8 +122,14 @@ PLAY RECAP *********************************************************************
 ### Running kubectl & helm via gostint
 Using a KUBECONFIG stored base64 encoded in the vault as a secret:
 ```
-$ vault kv put secret/k8s_cluster_1 kubeconfig_base64=$(base64 -w0 ~/k8s/openstack/admin.conf)
+$ vault kv put secret/k8s_cluster_1 \
+  kubeconfig_base64=$(base64 -w0 ~/k8s/openstack/admin.conf)
 Success! Data written to: secret/k8s_cluster_1
+```
+and add some test secrets for the gostint-kubectl test docker image to request from vault:
+```
+vault kv put kv/my-secret my-value=s3cr3t
+vault kv put kv/my-form field1=value1 field2=value2 field3=value3
 ```
 Test kubectl can use the vaulted config:
 ```
